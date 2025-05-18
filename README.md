@@ -1,0 +1,88 @@
+# bash_pm: Agile/Scrum CLI Tool
+
+This repository provides a simple command-line interface (CLI) for creating and managing Agile epics, stories, tasks, and comments. Data is stored locally in JSON format.
+
+## Prerequisites
+- Ruby (>= 2.5)
+- Standard Ruby libraries: `json`, `optparse`, `date`
+
+## Installation
+1. Clone this repository and change into the project directory:
+   ```bash
+   git clone <repo-url>
+   cd bash_pm
+   ```
+2. Make the main script executable:
+   ```bash
+   chmod +x agile.rb
+   ```
+3. (Optional) Add to your PATH for global use:
+   ```bash
+   ln -s $(pwd)/agile.rb /usr/local/bin/agile
+   ```
+
+## Usage
+Run the `agile` command (or `ruby agile.rb`) with the following structure:
+```bash
+./agile.rb <entity> <action> [options]
+```
+
+### Entities and Actions
+- **entity**: `epic`, `story`, `task`, `comment`
+- **action** for `epic|story|task`:
+  - `create`  Create a new item
+  - `list`    List all items of that type
+  - `show`    Show details for a single item
+  - `start`   Mark the item as started (timestamps `started_at`)
+  - `complete` Mark the item as completed (timestamps `completed_at`)
+- **action** for `comment`:
+  - `add`     Add a comment to an existing epic/story/task
+  - `list`    List comments for a given entity
+
+### Examples
+
+#### Create an Epic
+```bash
+./agile.rb epic create \
+  --title "Launch Website" \
+  --description "Design and deploy corporate site" \
+  --points 8 \
+  --difficulty 5
+```
+
+#### List Epics
+```bash
+./agile.rb epic list
+```
+
+#### Show Epic Details
+```bash
+./agile.rb epic show --id 1
+```
+
+#### Start a Story
+```bash
+./agile.rb story start --id 2
+```
+
+#### Complete a Task
+```bash
+./agile.rb task complete --id 3
+```
+
+#### Add a Comment
+```bash
+./agile.rb comment add --id 2 --content "Needs UX review"
+```
+
+#### List Comments
+```bash
+./agile.rb comment list --id 2
+```
+
+## Data Storage
+- All data is saved to `agile_data.json` in the current working directory.
+- The file is auto-generated on first run.
+
+## Contributing & License
+Feel free to fork and submit pull requests! No explicit license is set; add one if you wish to open-source this tool.
