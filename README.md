@@ -9,7 +9,7 @@ This repository provides a simple command-line interface (CLI) for creating and 
 ## Installation
 1. Clone this repository and change into the project directory:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/winslowb/bash_pm 
    cd bash_pm
    ```
 2. Make the main script executable:
