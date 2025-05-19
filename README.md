@@ -28,16 +28,19 @@ Run the `agile` command (or `ruby agile.rb`) with the following structure:
 ```
 
 ### Entities and Actions
-- **entity**: `epic`, `story`, `task`, `comment`
-- **action** for `epic|story|task`:
-  - `create`  Create a new item
-  - `list`    List all items of that type
-  - `show`    Show details for a single item
-  - `start`   Mark the item as started (timestamps `started_at`)
-  - `complete` Mark the item as completed (timestamps `completed_at`)
+- **entity**: `epic`, `story`, `task`, `sprint`, `comment`
+- **action** for `epic|story|task|sprint`:
+  - `create`   Create a new item
+  - `list`     List all items of that type
+  - `show`     Show details for a single item
+  - `start`    Mark the item as started (sets status to `doing`)
+  - `complete` Mark the item as completed (sets status to `done`)
+  - `link`     Link an item to an epic, story, or sprint
+  - `archive`  Archive an item (it will be hidden from lists)
+  - `delete`   Permanently delete an item
 - **action** for `comment`:
-  - `add`     Add a comment to an existing epic/story/task
-  - `list`    List comments for a given entity
+  - `add`      Add a comment to an existing epic/story/task
+  - `list`     List comments for a given entity
 
 ### Examples
 
@@ -78,6 +81,55 @@ Run the `agile` command (or `ruby agile.rb`) with the following structure:
 #### List Comments
 ```bash
 ./agile.rb comment list --id 2
+```
+
+#### Create a Sprint
+
+```bash
+./agile.rb sprint create \
+  --title "Sprint 1" \
+  --description "First development sprint" \
+  --start 2025-05-01 \
+  --end 2025-05-15
+```
+
+#### List Sprints
+
+```bash
+./agile.rb sprint list
+```
+
+#### Show Sprint Details
+
+```bash
+./agile.rb sprint show --id 1
+```
+
+#### Link a Story to an Epic/Sprint
+
+```bash
+./agile.rb story link --id 5 --epic 2 --sprint 1
+```
+
+#### Archive a Task
+
+```bash
+./agile.rb task archive --id 3
+```
+
+#### Delete an Epic
+
+```bash
+./agile.rb epic delete --id 4
+```
+
+#### View Backlog
+
+Items not linked to a sprint will remain in the backlog. To view backlog items, list stories or tasks:
+
+```bash
+./agile.rb story list
+./agile.rb task list
 ```
 
 ## Data Storage
