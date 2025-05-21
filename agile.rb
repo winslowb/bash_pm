@@ -3,6 +3,7 @@
 require 'json'
 require 'optparse'
 require 'date'
+require 'csv'
 
 class DataStore
   DATA_FILE = File.join(Dir.pwd, 'agile_data.json')
@@ -27,7 +28,7 @@ class DataStore
     id
   end
 
-  def create_entity(type:, title:, description:, story_points:, difficulty:)
+  def create_entity(type:, title:, description:, story_points:, difficulty:, assigned_to: nil)
     entity = {
       "id" => next_id,
       "type" => type,
@@ -35,6 +36,7 @@ class DataStore
       "description" => description,
       "story_points" => story_points,
       "difficulty" => difficulty,
+      "assigned_to" => assigned_to,
       "status" => "to do",
       "archived" => false,
       "created_at" => DateTime.now.to_s,
@@ -112,12 +114,69 @@ class DataStore
     save
     entity
   end
+
+  # Export data to JSON or CSV
+  def export_data(format:, output:)
+    case format
+    when 'json'
+      File.write(output, JSON.pretty_generate(@data))
+    when 'csv'
+      headers = %w[id type title description story_points difficulty status archived created_at started_at completed_at epic_id story_id sprint_id assigned_to]
+      CSV.open(output, 'w') do |csv|
+        csv << headers
+        @data['entities'].each do |e|
+          csv << headers.map { |h| e[h] }
+        end
+      end
+    else
+      raise "Unknown format: #{format}"
+    end
+  end
+
+  # Generate summary metrics
+  def report_metrics
+    metrics = {}
+    stats = {}
+    %w[epic story task].each do |t|
+      items = @data['entities'].select { |e| e['type'] == t }
+      total = items.size
+      to_do = items.count { |e| e['status'] == 'to do' }
+      doing = items.count { |e| e['status'] == 'doing' }
+      done = items.count { |e| e['status'] == 'done' }
+      archived = items.count { |e| e['archived'] }
+      points = items.map { |e| e['story_points'] || 0 }.sum
+      diffs = items.map { |e| e['difficulty'] || 0 }
+      avg_diff = diffs.empty? ? 0 : (diffs.sum.to_f / diffs.size).round(2)
+      stats[t] = { total: total, to_do: to_do, doing: doing, done: done, archived: archived, story_points: points, average_difficulty: avg_diff }
+    end
+    metrics[:entity_stats] = stats
+
+    tasks = @data['entities'].select { |e| e['type'] == 'task' }
+    sprints = @data['entities'].select { |e| e['type'] == 'sprint' }
+    per_sprint = {}
+    sprints.each do |s|
+      cnt = tasks.count { |t| t['sprint_id'] == s['id'] }
+      per_sprint[s['id']] = { title: s['title'], count: cnt }
+    end
+    metrics[:tasks_per_sprint] = per_sprint
+
+    per_assignee = {}
+    tasks.each do |t|
+      assignee = t['assigned_to'] || 'Unassigned'
+      per_assignee[assignee] ||= 0
+      per_assignee[assignee] += 1
+    end
+    metrics[:tasks_per_assignee] = per_assignee
+
+    metrics
+  end
 end
 
 def print_entity(entity)
   puts "ID: #{entity['id']}"
   puts "Type: #{entity['type']}"
   puts "Title: #{entity['title']}"
+  puts "Assigned To: #{entity['assigned_to']}" if entity.key?('assigned_to') && entity['assigned_to']
   puts "Description: #{entity['description']}"
   puts "Status: #{entity['status']}" if entity.key?("status")
   puts "Archived: #{entity['archived']}" if entity.key?("archived")
@@ -173,7 +232,7 @@ def print_entity(entity)
 end
 
 if ARGV.empty?
-  puts "Usage: agile [epic|story|task|sprint|comment] [action] [options]"
+  puts "Usage: agile [epic|story|task|sprint|comment|report] [action] [options]"
   exit 1
 end
 
@@ -214,6 +273,7 @@ when 'epic', 'story', 'task', 'sprint'
         opts.on("--description DESC", "Description") { |v| options[:description] = v }
         opts.on("--points N", Integer, "Story points") { |v| options[:story_points] = v }
         opts.on("--difficulty N", Integer, "Difficulty (engineering hours)") { |v| options[:difficulty] = v }
+        opts.on("--assigned-to ASSIGNEE", "Assign to person") { |v| options[:assigned_to] = v }
       end
       parser.parse!(ARGV)
       [:title, :description, :story_points, :difficulty].each do |opt|
@@ -223,7 +283,7 @@ when 'epic', 'story', 'task', 'sprint'
           exit 1
         end
       end
-      entity = ds.create_entity(type: type, title: options[:title], description: options[:description], story_points: options[:story_points], difficulty: options[:difficulty])
+      entity = ds.create_entity(type: type, title: options[:title], description: options[:description], story_points: options[:story_points], difficulty: options[:difficulty], assigned_to: options[:assigned_to])
       puts "#{type.capitalize} created with ID #{entity['id']}"
     end
 
@@ -312,6 +372,21 @@ when 'epic', 'story', 'task', 'sprint'
     ds.update_entity(options[:id], 'sprint_id' => options[:sprint_id]) if options[:sprint_id]
     puts "#{type.capitalize} #{options[:id]} linked successfully."
 
+  when 'assign'
+    options = {}
+    parser = OptionParser.new do |opts|
+      opts.banner = "Usage: agile #{type} assign --id ID --to ASSIGNEE"
+      opts.on("--id ID", Integer, "ID of the #{type}") { |v| options[:id] = v }
+      opts.on("--to ASSIGNEE", "User to assign to") { |v| options[:assigned_to] = v }
+    end
+    parser.parse!(ARGV)
+    unless options[:id] && options[:assigned_to]
+      puts "Missing --id or --to"
+      puts parser
+      exit 1
+    end
+    ds.update_entity(options[:id], 'assigned_to' => options[:assigned_to])
+    puts "#{type.capitalize} #{options[:id]} assigned to #{options[:assigned_to]}"
   when 'archive'
     options = {}
     parser = OptionParser.new do |opts|
@@ -348,6 +423,45 @@ when 'epic', 'story', 'task', 'sprint'
     exit 1
   end
 
+when 'report'
+  action = ARGV.shift
+  ds = DataStore.new
+  case action
+  when 'metrics'
+    metrics = ds.report_metrics
+    puts "Entity Stats:"
+    metrics[:entity_stats].each do |type, stat|
+      puts "  #{type.capitalize}s: total #{stat[:total]} (to do: #{stat[:to_do]}, doing: #{stat[:doing]}, done: #{stat[:done]}, archived: #{stat[:archived]})"
+      puts "    Story Points: #{stat[:story_points]}, Avg Difficulty: #{stat[:average_difficulty]}"
+    end
+    puts "\nTasks per Sprint:"
+    metrics[:tasks_per_sprint].each do |id, info|
+      puts "  [#{id}] #{info[:title]}: #{info[:count]}"
+    end
+    puts "\nTasks per Assignee:"
+    metrics[:tasks_per_assignee].each do |assignee, count|
+      puts "  #{assignee}: #{count}"
+    end
+  when 'export'
+    options = {}
+    parser = OptionParser.new do |opts|
+      opts.banner = "Usage: agile report export --format [json|csv] --output FILE"
+      opts.on("--format FORMAT", "Export format (json or csv)") { |v| options[:format] = v }
+      opts.on("--output FILE", "Output file path") { |v| options[:output] = v }
+    end
+    parser.parse!(ARGV)
+    unless options[:format] && options[:output]
+      puts "Missing --format or --output"
+      puts parser
+      exit 1
+    end
+    ds.export_data(format: options[:format], output: options[:output])
+    puts "Data exported to #{options[:output]}"
+  else
+    puts "Unknown report action '#{action}'."
+    puts "Available report actions: metrics, export"
+    exit 1
+  end
 when 'comment'
   action = ARGV.shift
   ds = DataStore.new
@@ -404,6 +518,6 @@ when 'comment'
 
 else
   puts "Unknown command '#{command}'."
-  puts "Usage: agile [epic|story|task|sprint|comment] [action] [options]"
+  puts "Usage: agile [epic|story|task|sprint|comment|report] [action] [options]"
   exit 1
 end

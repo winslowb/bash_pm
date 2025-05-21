@@ -28,7 +28,7 @@ Run the `agile` command (or `ruby agile.rb`) with the following structure:
 ```
 
 ### Entities and Actions
-- **entity**: `epic`, `story`, `task`, `sprint`, `comment`
+- **entity**: `epic`, `story`, `task`, `sprint`, `comment`, `report`
 - **action** for `epic|story|task|sprint`:
   - `create`   Create a new item
   - `list`     List all items of that type
@@ -38,9 +38,16 @@ Run the `agile` command (or `ruby agile.rb`) with the following structure:
   - `link`     Link an item to an epic, story, or sprint
   - `archive`  Archive an item (it will be hidden from lists)
   - `delete`   Permanently delete an item
+  - `assign`   Assign an item to a person (use `--to NAME`)
 - **action** for `comment`:
   - `add`      Add a comment to an existing epic/story/task
   - `list`     List comments for a given entity
+
+### Report Command
+- **entity**: `report`
+- **action** for `report`:
+  - `metrics`  Display summary metrics (counts, status breakdown, story points, etc.)
+  - `export`   Export all data to a file (`--format json|csv` `--output FILE`)
 
 ### Examples
 
